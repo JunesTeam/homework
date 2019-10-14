@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>listStudent</class>
+ <widget class="QDialog" name="listStudent">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>800</width>
+    <height>450</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>学员查询</string>
+  </property>
+  <layout class="QGridLayout" name="gridLayout">
+   <item row="0" column="0">
+    <layout class="QHBoxLayout" name="horizontalLayout" stretch="2,6,2">
+     <item>
+      <widget class="QComboBox" name="comboBox_method">
+       <item>
+        <property name="text">
+         <string>请选择查询方式</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>姓名</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>学号</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>专业</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>班</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>排</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>职务</string>
+        </property>
+       </item>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLineEdit" name="lineEdit_connect">
+       <property name="placeholderText">
+        <string>请输入文本（默认状态下查询所有）</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="pushButton_find">
+       <property name="text">
+        <string>查询</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item row="1" column="0">
+    <widget class="QTableView" name="tableView"/>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
