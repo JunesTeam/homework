@@ -1,10 +1,11 @@
 ﻿#include "liststudent.h"
 #include "ui_liststudent.h"
 #include <QMessageBox>
-#include <QTextStream>  //（文件）流式操作
-#include <QIODevice>    //打开模式(文件)
 #include <QDebug>
-#include <QStringList>  //string容器
+#include <QSqlRecord>           //获取记录
+#include <QSqlQuery>    //对数据库进行操作
+#include <QSqlError>    //输出错误
+#include "globle.h"     //使用全局变量
 #pragma execution_character_set("utf-8")    //防止出现中文乱码
 
 listStudent::listStudent(QWidget *parent) :
@@ -12,17 +13,45 @@ listStudent::listStudent(QWidget *parent) :
     ui(new Ui::listStudent)
 {
     ui->setupUi(this);
-    // 界面出来时，文件就应该已经读好
-    if (rFromFlie() == -1) {
-        this->close();  //未打开文件，关闭窗口
+
+    QSqlDatabase db;   //连接postgreql
+    if(QSqlDatabase::contains("qt_sql_default_connection"))
+        db = QSqlDatabase::database("qt_sql_default_connection");
+    else    {db = QSqlDatabase::addDatabase("QPSQL");
+
+    db.setHostName(sqlhost);      //连接数据库主机名，这里需要注意（若填的为”127.0.0.1“，出现不能连接，则改为localhost)
+    db.setPort(sqlport);                 //连接数据库端口号
+    db.setDatabaseName(sqlname);      //连接数据库名
+    db.setUserName(sqluser);          //数据库用户名
+    db.setPassword(sqlpass);   //数据库密码
+    db.setDatabaseName(sqldataname); //使用system数据库
     }
 
-    //构造函数中将表格具体化，设置表头
-    model = new QStandardItemModel;
-    //将表格模型设置为界面中的表格
+    if(!db.open())
+    {
+        //弹出提示窗口提示连接失败
+        QMessageBox::critical(this, "错误", "连接失败，请检查网络是否正确连接!", "确定");
+//        return ;
+    }
+
+    //设置模型
+    model = new QSqlTableModel();
+    model->setTable("学员");  //指定使用哪个表
+
+    //把model放在view
     ui->tableView->setModel(model);
-    //初始化表格
-    newTable();
+
+//    model->setHeaderData(0, Qt::Horizontal, "姓名");
+
+    //设置model的编辑模式，手动提交修改，修改后需要确定后才会修改到数据库
+    model->setEditStrategy(QSqlTableModel::OnManualSubmit);
+
+    QString str = QString("学员队 = '%1'").arg(username_qj);
+    model->setFilter(str);
+    model->select();
+
+    //设置view中的数据库不允许修改
+    //ui->tableView->setEditTriggers(QAbstractItemView::NoEditTriggers);
 }
 
 listStudent::~listStudent()
@@ -30,135 +59,132 @@ listStudent::~listStudent()
     delete ui;
 }
 
-//读取学生列表文件
-int listStudent::rFromFlie()
-{
-    QFile file("../system/data/student.csv");
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
-    {
-        //提示窗口提示未打开文件
-        QMessageBox::critical(this, "错误", "未找到../system/data/student.csv文件，无法进行正确查询", "确定");
-        return -1;
-    }
-
-    QTextStream in(&file);
-    while (!in.atEnd()) {
-        QString line = in.readLine();   //每次读取一行
-        list_stu.append(line);          //添加到列表中
-    }
-
-    file.close();
-
-//    int i = 0;
-//    for (i = 0; i < list_stu.length(); i++) {
-//        qDebug() << list_stu.at(i);     //打印列表，确认是否读取进去
-//    }
-
-    return 0;
-}
-
 //响应查询按钮
 void listStudent::on_pushButton_find_clicked()
 {
-    //每次查询前需要先清屏
-    newTable();
+    int index = ui->comboBox_method->currentIndex();
+    QString note = ui->lineEdit_connect->text();
+    QString str = "";
 
-    int index = this->ui->comboBox_method->currentIndex();  //获取查询方式下标
-    QString str = this->ui->lineEdit_connect->text();       //获取查询文本
-
-    //查询
-    find(index, str);
-}
-
-//查询
-void listStudent::find(int index, QString str)
-{
-    int i = 0;
-    int row  = 0; //查询到的数据在表格中的行号，每查到一次加一
-    for (i = 0; i < list_stu.length(); i++) {
-        QString line = list_stu.at(i);
-        QStringList subs = line.split(",");     //分割字符串,存进list列表中
-
-        //subs(name, id, sex, age, major, platoon, squad, job)
-        //index：name(1), id(2), major(3), squad(4), platoon(5)
-        if (str == "") {         //全部显示
-            display(row++, subs);
-        }
-        else {
-            switch (index) {
-            case 0:             //全部显示
-                display(row++, subs);
-                break;
-            case 1: //姓名
-                if (str == subs.at(0)){
-                    display(row++, subs);
-                }
-                break;
-            case 2: //学号
-                if (str == subs.at(1)){
-                    display(row++, subs);
-                }
-                break;
-            case 3: //专业
-                if (str == subs.at(4)){
-                    display(row++, subs);
-                }
-                break;
-            case 4: //班
-                if (str == subs.at(6)){
-                    display(row++, subs);
-                }
-                break;
-            case 5: //排
-                if (str == subs.at(5)){
-                    display(row++, subs);
-                }
-                break;
-            case 6: //职务
-                if (str == subs.at(7)){
-                    display(row++, subs);
-                }
-                break;
-            default:
-                break;
-            }
-        }
+    switch (index) {
+    case 0: //查找全部(只显示该学员队信息)
+        str = QString("学员队 = '%1'").arg(username_qj);
+        break;
+    case 1:
+        str = QString("姓名 = '%1' and 学员队 = '%2'").arg(note).arg(username_qj);
+        break;
+    case 2:
+        str = QString("学号 = '%1' and 学员队 = '%2'").arg(note).arg(username_qj);
+        break;
+    case 3: //专业
+        str = QString("专业 = '%1' and 学员队 = '%2'").arg(note).arg(username_qj);
+        break;
+    case 4: //班
+        str = QString("班 = '%1' and 学员队 = '%2'").arg(note).arg(username_qj);
+        break;
+    case 5: //排
+        str = QString("排 = '%1' and 学员队 = '%2'").arg(note).arg(username_qj);
+        break;
+    case 6: //职务
+        str = QString("职务 = '%1' and 学员队 = '%2'").arg(note).arg(username_qj);
+        break;
+    default:
+        str = QString("学员队 = '%1'").arg(username_qj);
+        break;
     }
+
+    model->setFilter(str);
+    model->select();
 }
 
-//显示数据在表格中
-void listStudent::display(int raw, QStringList subs)
+//确认修改按钮
+void listStudent::on_pushButton_sure_clicked()
 {
-    int i = 0;
-    //通过循环，将每一条数据取出，并存入表格中
-    for (i = 0; i < subs.length(); i++)
+    model->submitAll(); //提交动作
+}
+
+//取消修改按钮
+void listStudent::on_pushButton_cancle_clicked()
+{
+    model->revertAll(); //取消所用动作
+    model->submitAll(); //提交动作
+}
+
+//删除(通过点击行号)，可以选中多行删除(需要用到模型的概念：选中的多行就形成一个模型)
+//将会同时删除学员、用户、请销假表格中的相关信息
+void listStudent::on_pushButton_del_clicked()
+{
+    //使用默认连接
+    QSqlDatabase db;   //连接postgreql
+    if(QSqlDatabase::contains("qt_sql_default_connection"))
+        db = QSqlDatabase::database("qt_sql_default_connection");
+    else    {db = QSqlDatabase::addDatabase("QPSQL");
+
+    db.setHostName(sqlhost);      //连接数据库主机名，这里需要注意（若填的为”127.0.0.1“，出现不能连接，则改为localhost)
+    db.setPort(sqlport);                 //连接数据库端口号
+    db.setDatabaseName(sqlname);      //连接数据库名
+    db.setUserName(sqluser);          //数据库用户名
+    db.setPassword(sqlpass);   //数据库密码
+    db.setDatabaseName(sqldataname); //使用system数据库
+    }
+
+    if(!db.open())
     {
-        this->model->setItem(raw, i, new QStandardItem(subs.at(i)) ); //设置不同单元格
+        //弹出提示窗口提示连接失败
+        QMessageBox::critical(this, "错误", "连接失败，请检查网络是否正确连接!", "确定");
+//        return ;
     }
+
+    QSqlQuery query(db);
+    QVariantList ID;
+    //获取选中的模型
+    QItemSelectionModel *sModel =ui->tableView->selectionModel();
+    //取出模型中的索引(每条记录的索引集合)
+    QModelIndexList list = sModel->selectedRows();
+    //删除所有选中的行
+    for(int i = 0; i < list.size(); i++)
+    {
+        model->removeRow( list.at(i).row() );
+        ID << model->record(list.at(i).row()).value(1).toString();  //获取学号
+    }
+//    qDebug() << ID;
+
+    int ok = QMessageBox::warning(this, "删除选中行!", "你确定删除选中行吗（将会同时删除该用户的账号）？",
+                        "确定", "取消");
+    if(ok == 1)
+    {
+       model->revertAll();//如果不删除，则撤销
+    }
+    else {
+        model->submitAll(); //否则提交，在数据库中删除该行
+
+        //?表示一个占位符, prepare表示预处理语句
+        query.prepare("delete from 用户 where 账号 = ?");
+        query.addBindValue(ID); //成员类型：QVariantList，可批量处理
+        query.prepare("delete from 请销假 where 学号 = ?");
+        query.addBindValue(ID); //成员类型：QVariantList，可批量处理
+        if (query.execBatch())     //执行预处理语句
+            QMessageBox::warning(this, "成功!", "删除成功", "确定");
+    }
+    //重新显示查询结果
+    on_pushButton_find_clicked();
 }
 
-void listStudent::newTable()
+//id属性，即第1列，升序排列
+void listStudent::on_pushButton_sort_clicked()
 {
-    //清除原表格
-    model->clear();
-
-    //设置表头
-    model->setHorizontalHeaderItem(0, new QStandardItem("姓名") );    //即设置第0列头部单元格为姓名
-    model->setHorizontalHeaderItem(1, new QStandardItem("学号") );
-    model->setHorizontalHeaderItem(2, new QStandardItem("性别") );
-    model->setHorizontalHeaderItem(3, new QStandardItem("年龄") );
-    model->setHorizontalHeaderItem(4, new QStandardItem("专业") );
-    model->setHorizontalHeaderItem(5, new QStandardItem("排") );
-    model->setHorizontalHeaderItem(6, new QStandardItem("班") );
-    model->setHorizontalHeaderItem(7, new QStandardItem("职务") );
-
-    //设置列宽
-    ui->tableView->setColumnWidth(0,100);
-    ui->tableView->setColumnWidth(1,150);
-    ui->tableView->setColumnWidth(2,50);
-    ui->tableView->setColumnWidth(3,50);
-    ui->tableView->setColumnWidth(4,200);
-    ui->tableView->setColumnWidth(5,50);
-    ui->tableView->setColumnWidth(6,50);
-    ui->tableView->setColumnWidth(7,100);
+    model->setSort(1,Qt::AscendingOrder);
+    model->select();
 }
+
+//添加学员
+void listStudent::on_pushButton_add_clicked()
+{
+    add = new addstudent();
+    add->exec();
+}
+
+//void listStudent::receiveData2(QString str)
+//{
+//    data = str;
+//}

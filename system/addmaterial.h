@@ -16,7 +16,6 @@ public:
     ~addmaterial();
 
     void clear();   //清除界面
-    void wToFile(QString str);  //写到文件中
 
 private slots:
     void on_pushButton_ok_clicked();

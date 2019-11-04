@@ -10,6 +10,11 @@
     <height>480</height>
    </rect>
   </property>
+  <property name="font">
+   <font>
+    <family>Arial</family>
+   </font>
+  </property>
   <property name="windowTitle">
    <string>添加学员</string>
   </property>
@@ -39,6 +44,7 @@
        </property>
        <property name="font">
         <font>
+         <family>Arial</family>
          <pointsize>25</pointsize>
         </font>
        </property>

@@ -1,10 +1,9 @@
 ﻿#include "listmaterial.h"
 #include "ui_listmaterial.h"
 #include <QMessageBox>
-#include <QTextStream>  //（文件）流式操作
-#include <QIODevice>    //打开模式(文件)
-#include <QDebug>
-#include <QStringList>  //string容器
+#include <QSqlRecord>
+#include "addmaterial.h"
+#include "globle.h"
 #pragma execution_character_set("utf-8")    //防止出现中文乱码
 
 listmaterial::listmaterial(QWidget *parent) :
@@ -12,17 +11,41 @@ listmaterial::listmaterial(QWidget *parent) :
     ui(new Ui::listmaterial)
 {
     ui->setupUi(this);
-    // 界面出来时，文件就应该已经读好
-    if (rFromFlie() == -1) {
-        this->close();  //未打开文件，关闭窗口
+
+    QSqlDatabase db;   //连接postgreql
+    if(QSqlDatabase::contains("qt_sql_default_connection"))
+        db = QSqlDatabase::database("qt_sql_default_connection");
+    else    {
+        db = QSqlDatabase::addDatabase("QPSQL");
+        db.setHostName(sqlhost);      //连接数据库主机名，这里需要注意（若填的为”127.0.0.1“，出现不能连接，则改为localhost)
+        db.setPort(sqlport);                 //连接数据库端口号
+        db.setDatabaseName(sqlname);      //连接数据库名
+        db.setUserName(sqluser);          //数据库用户名
+        db.setPassword(sqlpass);   //数据库密码
+        db.setDatabaseName(sqldataname); //使用system数据库
     }
 
-    //构造函数中将表格具体化，设置表头
-    model = new QStandardItemModel;
-    //将表格模型设置为界面中的表格
+    if(!db.open())
+    {
+        //弹出提示窗口提示连接失败
+        QMessageBox::critical(this, "错误", "连接失败，请检查网络是否正确连接!", "确定");
+//        return ;
+    }
+
+    //设置模型
+    model = new QSqlTableModel();
+    model->setTable("物资");  //指定使用哪个表
+
+    //把model放在view
     ui->tableView->setModel(model);
-    //初始化表格
-    newTable();
+
+//    model->setHeaderData(0, Qt::Horizontal, "姓名");
+
+    //设置model的编辑模式，手动提交修改，修改后需要确定后才会修改到数据库
+    model->setEditStrategy(QSqlTableModel::OnManualSubmit);
+
+    //设置view中的数据库不允许修改
+    //ui->tableView->setEditTriggers(QAbstractItemView::NoEditTriggers);
 }
 
 listmaterial::~listmaterial()
@@ -30,109 +53,69 @@ listmaterial::~listmaterial()
     delete ui;
 }
 
-//读取物资列表文件
-int listmaterial::rFromFlie()
-{
-    QFile file("../system/data/material.csv");
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
-    {
-        //提示窗口提示未打开文件
-        QMessageBox::critical(this, "错误", "未找到../system/data/material.csv文件，无法进行正确查询", "确定");
-        return -1;
-    }
-
-    QTextStream in(&file);
-    while (!in.atEnd()) {
-        QString line = in.readLine();   //每次读取一行
-        list.append(line);          //添加到列表中
-    }
-
-    file.close();
-
-    return 0;
-}
-
 //响应查询按钮
 void listmaterial::on_pushButton_clicked()
 {
-    //每次查询前需要先清屏
-    newTable();
+    int index = ui->comboBox_method->currentIndex();
+    QString data = ui->lineEdit_connect->text();
+    QString str = "";
 
-    int index = this->ui->comboBox_method->currentIndex();  //获取查询方式下标
-    QString str = this->ui->lineEdit_connect->text();       //获取查询文本
-
-    //查询
-    find(index, str);
-}
-
-//查询
-void listmaterial::find(int index, QString str)
-{
-    int i = 0;
-    int row  = 0; //查询到的数据在表格中的行号，每查到一次加一
-    for (i = 0; i < list.length(); i++) {
-        QString line = list.at(i);
-        QStringList subs = line.split(",");     //分割字符串,存进list列表中
-
-        //material(name, num, place, fuze, note)
-        //index：name(1), place(2), fuze(3)
-        if (str == "") {         //全部显示
-            display(row++, subs);
-        }
-        else {
-            switch (index) {
-            case 0:             //全部显示
-                display(row++, subs);
-                break;
-            case 1: //名称
-                if (str == subs.at(0)){
-                    display(row++, subs);
-                }
-                break;
-            case 2: //存放位置
-                if (str == subs.at(2)){
-                    display(row++, subs);
-                }
-                break;
-            case 3: //负责人
-                if (str == subs.at(3)){
-                    display(row++, subs);
-                }
-                break;
-            default:
-                break;
-            }
-        }
+    switch (index) {
+    case 0: //查找全部
+        str = QString("学员队 = '%1'").arg(username_qj);
+        break;
+    case 1:
+        str = QString("名称 = '%1' and 学员队 = '%2'").arg(data).arg(username_qj);
+        break;
+    case 2:
+        str = QString("存放位置 = '%1' and 学员队 = '%2'").arg(data).arg(username_qj);
+        break;
+    case 3: //专业
+        str = QString("负责人 = '%1' and 学员队 = '%2'").arg(data).arg(username_qj);
+        break;
+    default:
+        str = QString("学员队 = '%1'").arg(username_qj);
+        break;
     }
+
+    model->setFilter(str);
+    model->select();
 }
 
-//显示数据在表格中
-void listmaterial::display(int raw, QStringList subs)
+void listmaterial::on_pushButton_del_clicked()
 {
-    int i = 0;
-    //通过循环，将每一条数据取出，并存入表格中
-    for (i = 0; i < subs.length(); i++)
+    //获取选中的模型
+    QItemSelectionModel *sModel =ui->tableView->selectionModel();
+    //取出模型中的索引(每条记录的索引集合)
+    QModelIndexList list = sModel->selectedRows();
+    //删除所有选中的行
+    for(int i = 0; i < list.size(); i++)
     {
-        this->model->setItem(raw, i, new QStandardItem(subs.at(i)) ); //设置不同单元格
+        model->removeRow( list.at(i).row() );
     }
+
+    int ok = QMessageBox::warning(this, "删除选中行!", "你确定删除选中行吗？",
+                        "确定", "取消");
+    if(ok == 1)
+    {
+       model->revertAll();//如果不删除，则撤销
+    }
+    else model->submitAll(); //否则提交，在数据库中删除该行
 }
 
-void listmaterial::newTable()
+void listmaterial::on_pushButton_sure_clicked()
 {
-    //清除原表格
-    model->clear();
+    model->submitAll(); //提交动作
+}
 
-    //设置表头
-    model->setHorizontalHeaderItem(0, new QStandardItem("名称") );    //即设置第0列头部单元格为名称
-    model->setHorizontalHeaderItem(1, new QStandardItem("数量") );
-    model->setHorizontalHeaderItem(2, new QStandardItem("存放位置") );
-    model->setHorizontalHeaderItem(3, new QStandardItem("负责人") );
-    model->setHorizontalHeaderItem(4, new QStandardItem("备注") );
+void listmaterial::on_pushButton_cancle_clicked()
+{
+    model->revertAll(); //取消所用动作
+    model->submitAll(); //提交动作
+}
 
-    //设置列宽
-    ui->tableView->setColumnWidth(0,100);
-    ui->tableView->setColumnWidth(1,50);
-    ui->tableView->setColumnWidth(2,100);
-    ui->tableView->setColumnWidth(3,100);
-    ui->tableView->setColumnWidth(4,200);
+void listmaterial::on_pushButton_add_clicked()
+{
+    addmaterial *add_m = new addmaterial();
+    add_m->exec();
 }

@@ -2,10 +2,8 @@
 #include "ui_addmaterial.h"
 #include <QMessageBox>  //小提示窗口
 #include <QPushButton>  //按钮
-//读写文件流
-#include <QFile>        //文件操作
-#include <QTextStream>  //（文件）流式操作
-#include <QIODevice>    //打开模式(文件)
+#include <QSqlQuery>    //对数据库进行操作
+#include "globle.h"     //使用全局变量
 #pragma execution_character_set("utf-8")    //防止出现中文乱码
 
 addmaterial::addmaterial(QWidget *parent) :
@@ -13,6 +11,19 @@ addmaterial::addmaterial(QWidget *parent) :
     ui(new Ui::addmaterial)
 {
     ui->setupUi(this);
+
+    QSqlDatabase db;   //连接postgreql
+    if (QSqlDatabase::contains("qt_sql_default_connection"))
+        db = QSqlDatabase::database("qt_sql_default_connection");
+    else {
+        db = QSqlDatabase::addDatabase("QPSQL");
+        db.setHostName(sqlhost);      //连接数据库主机名，这里需要注意（若填的为”127.0.0.1“，出现不能连接，则改为localhost)
+        db.setPort(sqlport);                 //连接数据库端口号
+        db.setDatabaseName(sqlname);      //连接数据库名
+        db.setUserName(sqluser);          //数据库用户名
+        db.setPassword(sqlpass);   //数据库密码
+        db.setDatabaseName(sqldataname); //使用system数据库
+    }
 }
 
 addmaterial::~addmaterial()
@@ -27,17 +38,18 @@ void addmaterial::on_pushButton_ok_clicked()
     int num = this->ui->spinBox_num->value();   //数量
     QString place = this->ui->lineEdit_place->text();   //存放位置
     QString fuze = this->ui->lineEdit_name_fuze->text();   //负责人
-    QString note = this->ui->lineEdit_note->text();        //备注
+    QString note = this->ui->lineEdit_note->text();        //备注SS
 
     if (note == "")
         note = "无";
 
+    QString sql = QString("INSERT INTO 物资 (名称, 数量, 存放位置, 负责人, 备注, 学员队)"
+                          "VALUES ('%1','%2','%3','%4','%5','%6')")
+                  .arg(name).arg(num).arg(place).arg(fuze).arg(note).arg(username_qj);    //SQL语句
+
     //显示内容, QString::number(platoon)->int转QString
     QString connect = "名  称：" + name + "\n数  量：" + QString::number(num) + "\n存放位置：" +place + '\n'
             + "负责人 ：" + fuze + "\n备注:" + note + '\n';
-    //每种物资独占一行，方便读取文件（readline）,以逗号分隔开（csv文件）
-    QString str = name + "," + QString::number(num) + "," +place + ','
-             + fuze + "," + note + '\n';
     int ret = 0;        //返回值
 
     // 判断输入信息是否完整,响应事件后弹出一个小窗口(QMessageBox)
@@ -49,8 +61,14 @@ void addmaterial::on_pushButton_ok_clicked()
         //获得返回值，从0开始计算，与定义按钮顺序相同，如点击确认返回0；
         ret = QMessageBox::question(this, "请确认信息：", connect, "取消", "确认");
         if (ret == 1) {
+            //开启一个事务
+            QSqlDatabase::database().transaction();
+            QSqlQuery query;
+            query.exec(sql);
+
+            //确定添加
+            QSqlDatabase::database().commit();
             QMessageBox::information(this, "成功", "物资添加成功", "确认");
-            wToFile(str);   //写入文件
             clear();        //点击确认后，清除原先界面
         }
     }
@@ -68,22 +86,3 @@ void addmaterial::clear()
     this->ui->lineEdit_name->setFocus();    //设置焦点
 }
 
-void addmaterial::wToFile(QString str)
-{
-    //写入文件,若不存在自动创建，（../ 表示当前路径的上一级路径）
-    //csv文件是以逗号为分隔符号，将各字段列分离出的一种ASCII文件。
-    //数据列以逗号分隔，每一行数据都以回车符结束。如果单元格中包含逗号，则该单元格中的内容以双引号引起。
-    QFile file("../system/data/meterial.csv");
-    //判断文件是否打，WriteOnly会把旧内容覆盖掉，防止覆盖，使用Append
-    if (!file.open(QIODevice::Append | QIODevice::Text))
-    {
-        //提示窗口提示未打开
-        QMessageBox::critical(this, "错误", "文件打开失败，信息未保存！", "确定");
-        return;
-    }
-
-    QTextStream out(&file); //实现流操作
-    out << str;
-
-    file.close();   //关闭文件
-}
