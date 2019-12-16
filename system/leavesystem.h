@@ -29,6 +29,7 @@ private:
     //表格模型
     QSqlTableModel *model;
     QSqlTableModel *model2;
+    QSqlTableModel *model3;
 };
 
 #endif // LEAVESYSTEM_H

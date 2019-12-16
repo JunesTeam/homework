@@ -32,6 +32,8 @@ private slots:
 
     void on_pushButton_clicked();
 
+    void on_pushButton_xiaojia_clicked();
+
 private:
     Ui::studentForm *ui;
     listuser *lis;

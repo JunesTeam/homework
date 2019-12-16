@@ -93,3 +93,21 @@ void studentForm::on_pushButton_clicked()
     login *a = new login();
     a->show();
 }
+
+void studentForm::on_pushButton_xiaojia_clicked()
+{
+    QSqlDatabase db;
+    int ret = QMessageBox::information(this, "确认页面", "是否确认已归队!", "确定", "取消");
+    if (ret == 0)
+    {
+        QString sql = QString("update 请销假 set 请假状态 = '已归队' where 学号 = '%1'").arg(username_qj);
+        QSqlQuery query(db);
+        if (!query.exec(sql))
+        {
+            QMessageBox::warning(this, "错误", "销假失败，请重试！", "确定");
+        }
+        else{
+            QMessageBox::information(this, "成功", "销假成功！", "确定");
+        }
+    }
+}

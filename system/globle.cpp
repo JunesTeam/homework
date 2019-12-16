@@ -13,11 +13,12 @@ QString sqlpass = "postgres";       //数据库密码
 QString sqldataname = "system";     //使用system数据库
 
 //初始：
-//main; mainwindow; login;
+//main; mainwindow; login（登录）; admin（管理员端）;
 //管理端：
-//system; addmaterial; addstudent; listsystem; listmaterial; liststudent;
+//system（队干部端）; addmaterial（添加物资）; addstudent（添加学员）; leavesystem（请销假）; listmaterial（物资管理）;
+//liststudent（人员管理）; pass1（修改密码）;
 //用户端：
-//studentform; listuser; pass2
+//studentform（学员端）; listuser（查看个人信息）; pass2（修改密码）; leave_stu（学员请假）
 
 /*
     QSqlDatabase db;   //连接postgreql

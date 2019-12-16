@@ -33,16 +33,20 @@ leaveSystem::leaveSystem(QWidget *parent) :
     model->setTable("请销假");  //指定使用哪个表
     model2 = new QSqlTableModel();
     model2->setTable("请销假");  //指定使用哪个表
+    model3 = new QSqlTableModel();
+    model3->setTable("请销假");  //指定使用哪个表
 
     //把model放在view
     ui->tableView_2->setModel(model);
     ui->tableView_3->setModel(model2);
+    ui->tableView_4->setModel(model3);
 
     //设置model的编辑模式，手动提交修改，修改后需要确定后才会修改到数据库
     //model->setEditStrategy(QSqlTableModel::OnManualSubmit);
 
     //设置view中的数据库不允许修改
     ui->tableView_2->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    ui->tableView_3->setEditTriggers(QAbstractItemView::NoEditTriggers);
     ui->tableView_3->setEditTriggers(QAbstractItemView::NoEditTriggers);
 
 //    ui->tableView_3->horizontalHeader()->setSelectionModel(QHeaderView::Stretch);
@@ -55,6 +59,12 @@ leaveSystem::leaveSystem(QWidget *parent) :
     //显示
     model2->setFilter(str2);
     model2->select();
+
+    /* 页面3：已归队*/
+    QString str3 = QString("请假状态 = '已归队' and 学员队 = '%1'").arg(username_qj);
+    //显示
+    model3->setFilter(str3);
+    model3->select();
 }
 
 leaveSystem::~leaveSystem()
@@ -133,5 +143,13 @@ void leaveSystem::on_tabWidget_currentChanged(int index)
     {
         /* 页面1：待批假*/
         pushButton_wait("待批假");
+    }
+    else if(index == 2)
+    {
+        /* 页面3：已归队*/
+        QString str3 = QString("请假状态 = '已归队' and 学员队 = '%1'").arg(username_qj);
+        //显示
+        model3->setFilter(str3);
+        model3->select();
     }
 }
